@@ -11,7 +11,7 @@ pub struct SyncRecordData<T, C: ApiClient> where T: IntegrationRecord + Debug + 
     pub create: CreateData<T, C>,
     pub update: UpdateData<T, C>,
     pub find_matching: FindMatchingData,
-    pub index_matching_id: fn(json: &Value) -> String,
+    pub index_matching_id: fn(json: &Value) -> Result<String, String>,
     pub deserialize: Option<fn(&Value) -> T>,
     pub to_api_client: C,
     pub to_type: String,
