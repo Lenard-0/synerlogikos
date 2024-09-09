@@ -7,7 +7,7 @@ pub async fn get_record<T: IntegrationRecord + for<'de> Deserialize<'de>>(
     final_url: &str,
     deserialize: Option<fn(&Value) -> T>,
     token: &str
-) -> Result<T, String> {
+) -> Result<(T, Value), String> {
     let client = Client::new();
 
     let response = client
@@ -21,21 +21,21 @@ pub async fn get_record<T: IntegrationRecord + for<'de> Deserialize<'de>>(
         return Err(format!("Error sending get record record: received status code {}    final_url: {}", response.status(), final_url));
     }
 
-    let record = match deserialize {
+     return match deserialize {
         Some(deserialize) => {
             let record: Value = response
                 .json()
                 .await
                 .map_err(|err| format!("Error deserializing response: {}", err))?;
-            deserialize(&record)
+            Ok((deserialize(&record), record))
         },
         None => {
-            response
-                .json::<T>()
+            let json_record: Value = response
+                .json()
                 .await
-                .map_err(|err| format!("Error deserializing response: {}", err))?
+                .map_err(|err| format!("Error deserializing response: {}", err))?;
+            let record: T = serde_json::from_value(json_record.clone()).expect("Failed to deserialise json");
+            return Ok((record, json_record))
         }
     };
-
-    Ok(record)
 }

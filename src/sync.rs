@@ -50,14 +50,14 @@ pub struct FindMatchingData {
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
 pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     parameters: SyncRecordData<T, From, To>,
-    meets_conditions: impl Fn(&T, From) -> Pin<Box<dyn Future<Output = Result<Option<Value>, String>>>>
+    meets_conditions: impl Fn(&T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Value>, String>>>>
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    let record: T = get_record(&parameters.get.url, parameters.deserialize, &parameters.from_api_client.access_token()).await?;
+    let (record, json) = get_record(&parameters.get.url, parameters.deserialize, &parameters.from_api_client.access_token()).await?;
     println!("got record: {:#?}", record);
 
-    match meets_conditions(&record, parameters.from_api_client).await? {
+    match meets_conditions(&record, json, parameters.from_api_client).await? {
         Some(_) => match find_matching::<T, To>(
             &record,
             &parameters.to_api_client,
