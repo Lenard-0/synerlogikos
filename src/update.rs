@@ -10,7 +10,7 @@ pub async fn update_record<T, C: ApiClient>(
     update_url: ConstructUrl<C>,
     api_client: &C,
     _type: &str,
-    existing_id: &Option<String>,
+    existing_id: Option<String>,
     payload: &Value
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     let reqwest_client = Client::new();

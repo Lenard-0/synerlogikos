@@ -11,10 +11,10 @@ pub struct SyncRecordData<T, C: ApiClient> where T: IntegrationRecord + Debug + 
     pub create: CreateData<T, C>,
     pub update: UpdateData<T, C>,
     pub find_matching: FindMatchingData,
+    pub index_matching_id: fn(json: &Value) -> String,
     pub deserialize: Option<fn(&Value) -> T>,
     pub to_api_client: C,
     pub to_type: String,
-    pub to_existing_record_id: Option<String>,
     pub token: String
 }
 
@@ -63,18 +63,18 @@ pub async fn sync_record<T, C: ApiClient>(
             parameters.find_matching.index_array,
             &parameters.token
         ).await? {
-            Some(_matching_record) => update_record::<T, C>(
+            Some(matching_record) => update_record::<T, C>(
                 parameters.update.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
-                &parameters.to_existing_record_id,
+                Some((parameters.index_matching_id)(&matching_record)),
                 &(parameters.update.payload)(&record)
             ).await?,
             None => create_record::<T, C>(
                 parameters.create.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
-                &parameters.to_existing_record_id,
+                None,
                 &(parameters.create.payload)(&record)
             ).await?
         },

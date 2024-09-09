@@ -10,11 +10,11 @@ pub async fn create_record<T, C: ApiClient>(
     construct_url: ConstructUrl<C>,
     api_client: &C,
     _type: &str,
-    existing_id: &Option<String>,
+    existing_id: Option<String>,
     payload: &Value,
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     let reqwest_client = Client::new();
-    let create_url = construct_url(api_client, _type, existing_id);
+    let create_url = construct_url(api_client, _type, &existing_id);
 
     let response = reqwest_client
         .post(&create_url)
