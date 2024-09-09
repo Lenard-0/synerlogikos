@@ -1,38 +1,55 @@
 use std::fmt::Debug;
-
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
 use crate::{sync::ConstructUrl, ApiClient, IntegrationRecord};
-
 
 pub async fn update_record<T, C: ApiClient>(
     update_url: ConstructUrl<C>,
     api_client: &C,
     _type: &str,
     existing_id: Option<String>,
-    payload: &Value
-) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+    payload: &Value,
+) -> Result<(), String>
+where
+    T: IntegrationRecord + Debug + for<'de> Deserialize<'de>,
+{
     let reqwest_client = Client::new();
 
     let update_url = update_url(api_client, _type, &existing_id);
+
+    // Enhanced error handling when sending the request
     let response = reqwest_client
         .patch(&update_url)
         .bearer_auth(api_client.access_token())
         .json(payload)
         .send()
         .await
-        .map_err(|err| format!("Error sending update request: {}     update_url: {} payload: {:#?}", err, update_url, payload))?;
+        .map_err(|err| {
+            format!(
+                "Error sending update request: {:#?}\nupdate_url: {}\npayload: {:#?}",
+                err, update_url, payload
+            )
+        })?;
 
     if !response.status().is_success() {
-        return Err(format!("Error updating record: received status code {}    update_url: {}   payload: {:#?}", response.status(), update_url, payload));
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read response body".to_string());
+
+        return Err(format!(
+            "Error updating record: received status code {}\nupdate_url: {}\npayload: {:#?}\nresponse body: {}",
+            status, update_url, payload, response_text
+        ));
     }
 
-    // Should impl properly at some point
-    let update_res = response
+    // Enhanced error handling when deserializing the response
+    let update_res: Value = response
         .json()
         .await
-        .map_err(|err| format!("Error deserializing response: {}", err))?;
+        .map_err(|err| format!("Error deserializing response: {:#?}", err))?;
 
-    return Ok(())
+    Ok(())
 }

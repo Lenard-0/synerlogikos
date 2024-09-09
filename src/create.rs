@@ -1,10 +1,8 @@
 use std::fmt::Debug;
-
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
 use crate::{sync::ConstructUrl, ApiClient, IntegrationRecord};
-
 
 pub async fn create_record<T, C: ApiClient>(
     construct_url: ConstructUrl<C>,
@@ -12,7 +10,10 @@ pub async fn create_record<T, C: ApiClient>(
     _type: &str,
     existing_id: Option<String>,
     payload: &Value,
-) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+) -> Result<(), String>
+where
+    T: IntegrationRecord + Debug + for<'de> Deserialize<'de>,
+{
     let reqwest_client = Client::new();
     let create_url = construct_url(api_client, _type, &existing_id);
 
@@ -22,17 +23,30 @@ pub async fn create_record<T, C: ApiClient>(
         .json(payload)
         .send()
         .await
-        .map_err(|err| format!("Error sending create request: {}     create_url: {} payload: {:#?}", err, create_url, payload))?;
+        .map_err(|err| {
+            format!(
+                "Error sending create request: {:#?}\ncreate_url: {}\npayload: {:#?}",
+                err, create_url, payload
+            )
+        })?;
 
     if !response.status().is_success() {
-        return Err(format!("Error creating record: received status code {}    create_url: {}   payload: {:#?}", response.status(), create_url, payload));
+        let status = response.status();
+        let response_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to read response body".to_string());
+
+        return Err(format!(
+            "Error creating record: received status code {}\ncreate_url: {}\npayload: {:#?}\nresponse body: {}",
+            status, create_url, payload, response_text
+        ));
     }
 
-    // Should impl properly at some point
-    let create_res = response
+    let create_res: Value = response
         .json()
         .await
-        .map_err(|err| format!("Error deserializing response: {}", err))?;
+        .map_err(|err| format!("Error deserializing response: {:#?}", err))?;
 
-    return Ok(())
+    Ok(())
 }
