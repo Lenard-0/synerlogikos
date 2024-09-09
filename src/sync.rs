@@ -12,6 +12,7 @@ pub struct SyncRecordData<T> where T: IntegrationRecord + Debug + for<'de> Deser
     pub create: CreateData<T>,
     pub update: UpdateData<T>,
     pub find_matching: FindMatchingData,
+    pub deserialize: Option<fn(&Value) -> T>,
     pub token: String
 }
 
@@ -47,7 +48,7 @@ pub async fn sync_record<T>(
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    let record: T = get_record(&parameters.get.url).await?;
+    let record: T = get_record(&parameters.get.url, parameters.deserialize).await?;
     println!("got record: {:#?}", record);
 
     match meets_conditions(&record) {
