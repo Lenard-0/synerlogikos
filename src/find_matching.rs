@@ -4,16 +4,16 @@ use std::fmt::Debug;
 use reqwest::{Client, Response};
 use serde::Deserialize;
 use serde_json::Value;
-use crate::IntegrationRecord;
+use crate::{ApiClient, IntegrationRecord};
 
 
-pub async fn find_matching<T>(
+pub async fn find_matching<T, C: ApiClient>(
     record: &T,
+    client: &C,
     properties: Vec<String>,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
-    token: &str
 ) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     for property in properties {
         let found_matching: Option<Value> = search_by_property(
@@ -22,7 +22,7 @@ pub async fn find_matching<T>(
             construct_search_url,
             payload,
             index_array,
-            token
+            &client.access_token()
         ).await?;
 
         if found_matching.is_some() {

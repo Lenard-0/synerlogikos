@@ -6,11 +6,13 @@ use crate::IntegrationRecord;
 pub async fn get_record<T: IntegrationRecord + for<'de> Deserialize<'de>>(
     final_url: &str,
     deserialize: Option<fn(&Value) -> T>,
+    token: &str
 ) -> Result<T, String> {
     let client = Client::new();
 
     let response = client
         .get(final_url)
+        .bearer_auth(token)
         .send()
         .await
         .map_err(|err| format!("Error sending get record request: {}     final_url: {}", err, final_url))?;

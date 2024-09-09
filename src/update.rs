@@ -18,6 +18,7 @@ pub async fn update_record<T, C: ApiClient>(
     let update_url = update_url(api_client, _type, &existing_id);
     let response = reqwest_client
         .patch(&update_url)
+        .bearer_auth(api_client.access_token())
         .json(payload)
         .send()
         .await

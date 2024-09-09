@@ -18,6 +18,7 @@ pub async fn create_record<T, C: ApiClient>(
 
     let response = reqwest_client
         .post(&create_url)
+        .bearer_auth(api_client.access_token())
         .json(payload)
         .send()
         .await

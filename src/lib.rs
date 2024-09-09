@@ -9,4 +9,6 @@ pub trait IntegrationRecord {
     fn index_property(&self, property: &str) -> Option<String>;
 }
 
-pub trait ApiClient {}
+pub trait ApiClient {
+    fn access_token(&self) -> String;
+}
