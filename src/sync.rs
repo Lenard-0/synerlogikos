@@ -71,14 +71,14 @@ pub async fn sync_record<T, C: ApiClient>(
                 &parameters.to_api_client,
                 &parameters.to_type,
                 Some((parameters.index_matching_id)(&matching_record)?),
-                &(parameters.update.payload)(&record)?
+                &(parameters.update.payload)(&record, None)?
             ).await?,
             None => create_record::<T, C>(
                 parameters.create.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
                 None,
-                &(parameters.create.payload)(&record)?
+                &(parameters.create.payload)(&record, None)?
             ).await?
         },
         false => println!("Record did not meet conditions to sync")
