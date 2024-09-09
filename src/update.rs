@@ -6,25 +6,25 @@ use serde_json::Value;
 use crate::IntegrationRecord;
 
 
-pub async fn create_record<T>(
-    create_url: &str,
+pub async fn update_record<T>(
+    update_url: &str,
     payload: &Value
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     let client = Client::new();
 
     let response = client
-        .post(create_url)
+        .patch(update_url)
         .json(payload)
         .send()
         .await
-        .map_err(|err| format!("Error sending create request: {}     create_url: {} payload: {:#?}", err, create_url, payload))?;
+        .map_err(|err| format!("Error sending update request: {}     update_url: {} payload: {:#?}", err, update_url, payload))?;
 
     if !response.status().is_success() {
-        return Err(format!("Error creating record: received status code {}    create_url: {}   payload: {:#?}", response.status(), create_url, payload));
+        return Err(format!("Error updating record: received status code {}    update_url: {}   payload: {:#?}", response.status(), update_url, payload));
     }
 
     // Should impl properly at some point
-    let create_res = response
+    let update_res = response
         .json()
         .await
         .map_err(|err| format!("Error deserializing response: {}", err))?;
