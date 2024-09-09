@@ -39,7 +39,7 @@ pub struct UpdateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<
 pub struct FindMatchingData {
     pub properties: Vec<String>,
     pub construct_search_url: fn(property: &str) -> String,
-    pub payload: fn(property: &str) -> Value,
+    pub payload: Option<fn(property: &str) -> Value>,
     pub index_array: fn(json: Value) -> Value,
 }
 
