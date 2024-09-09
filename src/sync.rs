@@ -50,7 +50,7 @@ pub struct FindMatchingData {
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
 pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     parameters: SyncRecordData<T, From, To>,
-    meets_conditions: impl Fn(T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Value>, String>>>>
+    meets_conditions: impl Fn(T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>,
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
@@ -58,7 +58,7 @@ pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     println!("got record: {:#?}", record);
 
     match meets_conditions(record.clone(), json, parameters.from_api_client).await? {
-        Some(_) => match find_matching::<T, To>(
+        Some(opt_company) => match find_matching::<T, To>(
             &record,
             &parameters.to_api_client,
             parameters.find_matching.properties,
@@ -71,20 +71,27 @@ pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
                 &parameters.to_api_client,
                 &parameters.to_type,
                 Some((parameters.index_matching_id)(&matching_record)?),
-                &(parameters.update.payload)(&record, None)?
+                &(parameters.update.payload)(&record, get_json_id(opt_company))?
             ).await?,
             None => create_record::<T, To>(
                 parameters.create.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
                 None,
-                &(parameters.create.payload)(&record, None)?
+                &(parameters.create.payload)(&record, get_json_id(opt_company))?
             ).await?
         },
         None => println!("Record did not meet conditions to sync")
     };
 
     return Ok(())
+}
+
+fn get_json_id(opt_comp: Option<Value>) -> Option<String> {
+    match opt_comp {
+        Some(comp) => Some(comp["id"].as_str().unwrap().to_string()),
+        None => None
+    }
 }
 
 // Outdated:
