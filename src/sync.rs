@@ -38,7 +38,7 @@ pub struct UpdateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<
 
 pub struct FindMatchingData {
     pub properties: Vec<String>,
-    pub construct_search_url: fn(property: &str) -> String,
+    pub construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     pub payload: Option<fn(property: &str) -> Value>,
     pub index_array: fn(json: Value) -> Value,
 }
@@ -59,6 +59,7 @@ pub async fn sync_record<T, C: ApiClient>(
 
     match meets_conditions(&record) {
         true => match find_matching::<T>(
+            &record,
             parameters.find_matching.properties,
             parameters.find_matching.construct_search_url,
             parameters.find_matching.payload,

@@ -8,14 +8,22 @@ use crate::IntegrationRecord;
 
 
 pub async fn find_matching<T>(
+    record: &T,
     properties: Vec<String>,
-    construct_search_url: fn(property: &str) -> String,
+    construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
     token: &str
 ) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     for property in properties {
-        let found_matching: Option<Value> = search_by_property(&property, construct_search_url, payload, index_array, token).await?;
+        let found_matching: Option<Value> = search_by_property(
+            &property,
+            record,
+            construct_search_url,
+            payload,
+            index_array,
+            token
+        ).await?;
 
         if found_matching.is_some() {
             return Ok(found_matching)
@@ -25,17 +33,25 @@ pub async fn find_matching<T>(
     return Ok(None)
 }
 
-async fn search_by_property(
+async fn search_by_property<T>(
     property: &str,
-    construct_search_url: fn(property: &str) -> String,
+    record: &T,
+    construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
     token: &str
-) -> Result<Option<Value>, String> {
+) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     let client = Client::new();
 
+    let property_value = match record.index_property(property) {
+        Some(value) => value,
+        None => {
+            println!("Potential error! Could not index property: {property} on record: {:#?}", record);
+            return Ok(None)
+        }
+    };
     return match payload {
-        Some(payload) => match client.post(construct_search_url(&property))
+        Some(payload) => match client.post(construct_search_url(&property, &property_value)?)
             .bearer_auth(&token)
             .json(&payload(&property))
             .send()
@@ -43,7 +59,7 @@ async fn search_by_property(
             Ok(res) => check_array_search_only_contains_one(res, index_array).await,
             Err(err) => Err(format!("Error searching for matching: {}", err))
         },
-        None => match client.get(construct_search_url(&property))
+        None => match client.get(construct_search_url(&property, &property_value)?)
             .bearer_auth(&token)
             .send()
             .await {

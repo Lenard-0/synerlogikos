@@ -17,6 +17,6 @@ mod tests {
         // ).await.unwrap();
 
         struct Contact {}
-        impl IntegrationRecord for Contact {}
+        // impl IntegrationRecord for Contact {}
     }
 }
