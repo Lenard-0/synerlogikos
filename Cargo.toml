@@ -2,9 +2,15 @@
 name = "synerlogikos"
 version = "0.1.0"
 edition = "2021"
+description = "A high-level, generic, abstracted Rust library for building any integration. It is designed to abstract away common patterns found in all integrations multiple times."
+license = "Apache-2.0"
+repository = "https://github.com/lenard-0/synerlogikos"
+readme = "README.md"
+keywords = ["integration", "webhook", "rust", "automation"]
+categories = ["api-bindings", "asynchronous", "network-programming"]
 
 [dependencies]
-serde_json = "1.0.108"
+serde_json = "1.0.128"
 reqwest = { version = "0.12.7", features = ["json"] }
 tokio = { version = "1.40.0", features = ["full"] }
-serde = { version = "1.0.209", features = ["derive"] }
+serde = { version = "1.0.210", features = ["derive"] }

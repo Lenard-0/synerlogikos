@@ -46,7 +46,6 @@ pub async fn sync_record<T>(
     meets_conditions: fn(record: &T) -> bool,
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
-
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     let record: T = get_record(&parameters.get.url).await?;
     println!("got record: {:#?}", record);
