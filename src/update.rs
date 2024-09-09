@@ -3,17 +3,21 @@ use std::fmt::Debug;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
-use crate::IntegrationRecord;
+use crate::{sync::ConstructUrl, ApiClient, IntegrationRecord};
 
 
-pub async fn update_record<T>(
-    update_url: &str,
+pub async fn update_record<T, C: ApiClient>(
+    update_url: ConstructUrl<C>,
+    api_client: &C,
+    _type: &str,
+    existing_id: &Option<String>,
     payload: &Value
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    let client = Client::new();
+    let reqwest_client = Client::new();
 
-    let response = client
-        .patch(update_url)
+    let update_url = update_url(api_client, _type, &existing_id);
+    let response = reqwest_client
+        .patch(&update_url)
         .json(payload)
         .send()
         .await

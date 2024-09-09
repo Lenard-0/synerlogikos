@@ -3,17 +3,21 @@ use std::fmt::Debug;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
-use crate::IntegrationRecord;
+use crate::{sync::ConstructUrl, ApiClient, IntegrationRecord};
 
 
-pub async fn create_record<T>(
-    create_url: &str,
-    payload: &Value
+pub async fn create_record<T, C: ApiClient>(
+    construct_url: ConstructUrl<C>,
+    api_client: &C,
+    _type: &str,
+    existing_id: &Option<String>,
+    payload: &Value,
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    let client = Client::new();
+    let reqwest_client = Client::new();
+    let create_url = construct_url(api_client, _type, existing_id);
 
-    let response = client
-        .post(create_url)
+    let response = reqwest_client
+        .post(&create_url)
         .json(payload)
         .send()
         .await

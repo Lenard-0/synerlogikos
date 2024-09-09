@@ -6,3 +6,5 @@ pub mod update;
 pub mod find_matching;
 
 pub trait IntegrationRecord {}
+
+pub trait ApiClient {}

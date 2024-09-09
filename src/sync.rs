@@ -3,16 +3,18 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::{create::create_record, find_matching::find_matching, get::get_record, update::update_record, IntegrationRecord};
+use crate::{create::create_record, find_matching::find_matching, get::get_record, update::update_record, ApiClient, IntegrationRecord};
 use core::fmt::Debug;
 
-pub struct SyncRecordData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    // record_id: String,
+pub struct SyncRecordData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     pub get: GetData,
-    pub create: CreateData<T>,
-    pub update: UpdateData<T>,
+    pub create: CreateData<T, C>,
+    pub update: UpdateData<T, C>,
     pub find_matching: FindMatchingData,
     pub deserialize: Option<fn(&Value) -> T>,
+    pub to_api_client: C,
+    pub to_type: String,
+    pub to_existing_record_id: Option<String>,
     pub token: String
 }
 
@@ -20,29 +22,31 @@ pub struct GetData {
     pub url: String,
 }
 
-pub struct CreateData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    pub url: String,
+pub struct CreateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+    pub url: ConstructUrl<C>,
     pub payload: fn(&T) -> Value,
 }
 
-pub struct UpdateData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    pub url: String,
-    payload: fn(&T) -> Value,
+pub type ConstructUrl<C> = fn(client: &C, _type: &str, existing_id: &Option<String>) -> String;
+
+pub struct UpdateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+    pub url: ConstructUrl<C>,
+    pub payload: fn(&T) -> Value,
 }
 
 pub struct FindMatchingData {
-    properties: Vec<String>,
-    construct_search_url: fn(property: &str) -> String,
-    payload: fn(property: &str) -> Value,
-    index_array: fn(json: Value) -> Value,
+    pub properties: Vec<String>,
+    pub construct_search_url: fn(property: &str) -> String,
+    pub payload: fn(property: &str) -> Value,
+    pub index_array: fn(json: Value) -> Value,
 }
 
 
 /// To sync a record from one application to another
 /// Both records should implement IntegrationRecord
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
-pub async fn sync_record<T>(
-    parameters: SyncRecordData<T>,
+pub async fn sync_record<T, C: ApiClient>(
+    parameters: SyncRecordData<T, C>,
     // get_record: impl Fn(&str) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (id: &str) -> Result<Option<T>, String>
     meets_conditions: fn(record: &T) -> bool,
     // find matching should return the matching record from the other system
@@ -59,8 +63,20 @@ pub async fn sync_record<T>(
             parameters.find_matching.index_array,
             &parameters.token
         ).await? {
-            Some(_matching_record) => update_record::<T>(&parameters.update.url, &(parameters.update.payload)(&record)).await?,
-            None => create_record::<T>(&parameters.create.url, &(parameters.create.payload)(&record)).await?
+            Some(_matching_record) => update_record::<T, C>(
+                parameters.update.url,
+                &parameters.to_api_client,
+                &parameters.to_type,
+                &parameters.to_existing_record_id,
+                &(parameters.update.payload)(&record)
+            ).await?,
+            None => create_record::<T, C>(
+                parameters.create.url,
+                &parameters.to_api_client,
+                &parameters.to_type,
+                &parameters.to_existing_record_id,
+                &(parameters.create.payload)(&record)
+            ).await?
         },
         false => println!("Record did not meet conditions to sync")
     };
