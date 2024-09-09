@@ -70,7 +70,7 @@ pub async fn sync_record<T, C: ApiClient>(
                 parameters.update.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
-                Some((parameters.index_matching_id)(&matching_record)),
+                Some((parameters.index_matching_id)(&matching_record)?),
                 &(parameters.update.payload)(&record)?
             ).await?,
             None => create_record::<T, C>(
