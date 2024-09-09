@@ -1,5 +1,5 @@
 
-use std::fmt::Debug;
+use std::{fmt::Debug, thread::sleep, time::Duration};
 
 use reqwest::{Client, Response};
 use serde::Deserialize;
@@ -28,6 +28,8 @@ pub async fn find_matching<T, C: ApiClient>(
         if found_matching.is_some() {
             return Ok(found_matching)
         }
+
+        sleep(Duration::from_millis(500));
     }
 
     return Ok(None)
