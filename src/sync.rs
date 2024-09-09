@@ -24,14 +24,16 @@ pub struct GetData {
 
 pub struct CreateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     pub url: ConstructUrl<C>,
-    pub payload: fn(&T) -> Value,
+    pub payload: ConstructPayload<T>
 }
+
+pub type ConstructPayload<T> = fn(&T) -> Result<Value, String>;
 
 pub type ConstructUrl<C> = fn(client: &C, _type: &str, existing_id: &Option<String>) -> String;
 
 pub struct UpdateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     pub url: ConstructUrl<C>,
-    pub payload: fn(&T) -> Value,
+    pub payload: ConstructPayload<T>
 }
 
 pub struct FindMatchingData {
@@ -68,14 +70,14 @@ pub async fn sync_record<T, C: ApiClient>(
                 &parameters.to_api_client,
                 &parameters.to_type,
                 Some((parameters.index_matching_id)(&matching_record)),
-                &(parameters.update.payload)(&record)
+                &(parameters.update.payload)(&record)?
             ).await?,
             None => create_record::<T, C>(
                 parameters.create.url,
                 &parameters.to_api_client,
                 &parameters.to_type,
                 None,
-                &(parameters.create.payload)(&record)
+                &(parameters.create.payload)(&record)?
             ).await?
         },
         false => println!("Record did not meet conditions to sync")
