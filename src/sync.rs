@@ -27,7 +27,7 @@ pub struct CreateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<
     pub payload: ConstructPayload<T>
 }
 
-pub type ConstructPayload<T> = fn(&T) -> Result<Value, String>;
+pub type ConstructPayload<T> = fn(&T, Option<String>) -> Result<Value, String>;
 
 pub type ConstructUrl<C> = fn(client: &C, _type: &str, existing_id: &Option<String>) -> String;
 
