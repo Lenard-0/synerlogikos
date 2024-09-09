@@ -17,7 +17,6 @@ pub struct SyncRecordData<T, From: ApiClient, To: ApiClient> where T: Integratio
     pub from_api_client: From,
     pub to_api_client: To,
     pub to_type: String,
-    pub from_token: String
 }
 
 pub struct GetData {
@@ -55,7 +54,7 @@ pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    let record: T = get_record(&parameters.get.url, parameters.deserialize, &parameters.from_token).await?;
+    let record: T = get_record(&parameters.get.url, parameters.deserialize, &parameters.from_api_client.access_token()).await?;
     println!("got record: {:#?}", record);
 
     match meets_conditions(&record, parameters.from_api_client).await? {
