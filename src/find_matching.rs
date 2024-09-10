@@ -3,7 +3,7 @@ use std::{fmt::Debug, thread::sleep, time::Duration};
 
 use reqwest::{Client, Response};
 use serde::Deserialize;
-use serde_json::Value;
+use serde_json::{value, Value};
 use crate::{ApiClient, IntegrationRecord};
 
 
@@ -12,7 +12,7 @@ pub async fn find_matching<T, C: ApiClient>(
     client: &C,
     properties: Vec<String>,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
-    payload: Option<fn(property: &str) -> Value>,
+    payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
 ) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     for property in properties {
@@ -39,7 +39,7 @@ async fn search_by_property<T>(
     property: &str,
     record: &T,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
-    payload: Option<fn(property: &str) -> Value>,
+    payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
     token: &str
 ) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
@@ -55,7 +55,7 @@ async fn search_by_property<T>(
     return match payload {
         Some(payload) => match client.post(construct_search_url(&property, &property_value)?)
             .bearer_auth(&token)
-            .json(&payload(&property))
+            .json(&payload(&property, &property_value))
             .send()
             .await {
             Ok(res) => check_array_search_only_contains_one(res, index_array).await,
