@@ -50,41 +50,60 @@ pub struct FindMatchingData {
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
 pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     parameters: SyncRecordData<T, From, To>,
-    meets_conditions: impl Fn(T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>,
+    meets_conditions: Option<impl Fn(T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>>,
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
-    let (record, json) = get_record(&parameters.get.url, parameters.deserialize, &parameters.from_api_client.access_token()).await?;
+    let (record, json) = get_record(&parameters.get.url, parameters.deserialize.clone(), &parameters.from_api_client.access_token()).await?;
     println!("got record: {:#?}", record);
 
-    match meets_conditions(record.clone(), json, parameters.from_api_client).await? {
-        Some(opt_company) => match find_matching::<T, To>(
-            &record,
-            &parameters.to_api_client,
-            parameters.find_matching.properties,
-            parameters.find_matching.construct_search_url,
-            parameters.find_matching.payload,
-            parameters.find_matching.index_array,
-        ).await? {
-            Some(matching_record) => update_record::<T, To>(
-                parameters.update.url,
-                &parameters.to_api_client,
-                &parameters.to_type,
-                Some((parameters.index_matching_id)(&matching_record)?),
-                &(parameters.update.payload)(&record, get_json_id(opt_company))?
-            ).await?,
-            None => create_record::<T, To>(
-                parameters.create.url,
-                &parameters.to_api_client,
-                &parameters.to_type,
-                None,
-                &(parameters.create.payload)(&record, get_json_id(opt_company))?
-            ).await?
+    return match meets_conditions {
+        Some(meets_conditions) => match meets_conditions(record.clone(), json, parameters.from_api_client.clone()).await? {
+            Some(opt_company) => actualise_sync(parameters, record, opt_company).await,
+            None => {
+                println!("Record did not meet conditions to sync");
+                return Ok(())
+            }
         },
-        None => println!("Record did not meet conditions to sync")
-    };
+        None => actualise_sync(parameters, record, None).await
+    }
+}
 
-    return Ok(())
+async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
+    parameters: SyncRecordData<T, From, To>,
+    record: T,
+    opt_comp: Option<Value>,
+    // find matching should return the matching record from the other system
+    // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
+) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
+    Ok(match find_matching::<T, To>(
+        &record,
+        &parameters.to_api_client,
+        parameters.find_matching.properties,
+        parameters.find_matching.construct_search_url,
+        parameters.find_matching.payload,
+        parameters.find_matching.index_array,
+    ).await? {
+        Some(matching_record) => update_record::<T, To>(
+            parameters.update.url,
+            &parameters.to_api_client,
+            &parameters.to_type,
+            Some((parameters.index_matching_id)(&matching_record)?),
+            &(parameters.create.payload)(&record, get_json_id(opt_comp))?
+            // TODO: implement this
+            // match opt_company {
+            //             None => &(parameters.create.payload)(&record, get_json_id(opt_company))?,
+            //             Some(opt_company) => find_matching_contacts_company_id(opt_company)?
+            // }
+        ).await?,
+        None => create_record::<T, To>(
+            parameters.create.url,
+            &parameters.to_api_client,
+            &parameters.to_type,
+            None,
+            &(parameters.create.payload)(&record, get_json_id(opt_comp))?
+        ).await?
+    })
 }
 
 fn get_json_id(opt_comp: Option<Value>) -> Option<String> {

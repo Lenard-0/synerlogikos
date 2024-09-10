@@ -11,4 +11,5 @@ pub trait IntegrationRecord {
 
 pub trait ApiClient {
     fn access_token(&self) -> String;
+    fn clone(&self) -> Self;
 }
