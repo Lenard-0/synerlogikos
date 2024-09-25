@@ -1,24 +1,23 @@
 
-use std::{fmt::Debug, thread::sleep, time::Duration};
+use std::{thread::sleep, time::Duration};
 
 use reqwest::{Client, Response};
-use serde::Deserialize;
 use serde_json::Value;
-use crate::{ApiClient, IntegrationRecord};
+use crate::{sync::AssociateRecord, ApiClient, IntegrationRecord};
 
 
-pub async fn find_matching<T, C: ApiClient>(
-    record: &T,
+pub async fn find_matching<C: ApiClient>(
+    record: Box<impl IntegrationRecord + ? Sized>,
     client: &C,
     properties: Vec<String>,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
-) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+) -> Result<Option<Value>, String> {
     for property in properties {
         let found_matching: Option<Value> = search_by_property(
             &property,
-            record,
+            &record,
             construct_search_url,
             payload,
             index_array,
@@ -35,20 +34,20 @@ pub async fn find_matching<T, C: ApiClient>(
     return Ok(None)
 }
 
-async fn search_by_property<T>(
+async fn search_by_property(
     property: &str,
-    record: &T,
+    record: &Box<impl IntegrationRecord + ? Sized>,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
     token: &str
-) -> Result<Option<Value>, String> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+) -> Result<Option<Value>, String> {
     let client = Client::new();
 
     let property_value = match record.index_property(property) {
         Some(value) => value,
         None => {
-            println!("Potential error! Could not index property: {property} on record: {:#?}", record);
+            println!("Potential error! Could not index property: {property} on record");
             return Ok(None)
         }
     };
@@ -79,5 +78,32 @@ async fn check_array_search_only_contains_one(
     match index_array(json).as_array() {
         Some(arr) if arr.len() == 1 => Ok(Some(arr[0].clone())),
         _ => Ok(None),
+    }
+}
+
+pub async fn find_matching_associate_record<C: ApiClient>(
+    from_record: Option<Value>,
+    api_client: &C,
+    get_matching_record_id_for_association: Option<AssociateRecord>,
+) -> Result<Option<String>, String> {
+    match from_record {
+        Some(record) => match get_matching_record_id_for_association {
+            Some(get_matching_record_id_for_association) => {
+                let matching = find_matching(
+                    (*get_matching_record_id_for_association.to_record)(&record),
+                    api_client,
+                    get_matching_record_id_for_association.find_matching.properties,
+                    get_matching_record_id_for_association.find_matching.construct_search_url,
+                    get_matching_record_id_for_association.find_matching.payload,
+                    get_matching_record_id_for_association.find_matching.index_array,
+                ).await?;
+                match matching {
+                    Some(matching) => Ok((get_matching_record_id_for_association.extract_id)(&matching)?),
+                    None => Ok(None)
+                }
+            },
+            None => Ok(None)
+        }
+        None => Ok(None)
     }
 }

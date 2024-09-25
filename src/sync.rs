@@ -3,7 +3,7 @@
 use serde::Deserialize;
 use serde_json::Value;
 
-use crate::{create::create_record, find_matching::find_matching, get::get_record, update::update_record, ApiClient, IntegrationRecord};
+use crate::{create::create_record, find_matching::{find_matching, find_matching_associate_record}, get::get_record, update::update_record, ApiClient, IntegrationRecord};
 use core::fmt::Debug;
 use std::{future::Future, pin::Pin};
 
@@ -17,7 +17,13 @@ pub struct SyncRecordData<T, From: ApiClient, To: ApiClient> where T: Integratio
     pub from_api_client: From,
     pub to_api_client: To,
     pub to_type: String,
-    pub get_matching_record_id_for_association: Option<fn(matching_record: Value) -> Pin<Box<dyn Future<Output = Result<String, String>>>>>,
+    pub get_matching_record_id_for_association: Option<AssociateRecord>,
+}
+
+pub struct AssociateRecord {
+    pub find_matching: FindMatchingData,
+    pub to_record: Box<dyn Fn(&Value) -> Box<dyn IntegrationRecord>>,
+    pub extract_id: fn(&Value) -> Result<Option<String>, String>,
 }
 
 pub struct GetData {
@@ -77,8 +83,9 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
-    Ok(match find_matching::<T, To>(
-        &record,
+
+    Ok(match find_matching::<To>(
+        Box::new(record.clone()),
         &parameters.to_api_client,
         parameters.find_matching.properties,
         parameters.find_matching.construct_search_url,
@@ -90,29 +97,27 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
             &parameters.to_api_client,
             &parameters.to_type,
             Some((parameters.index_matching_id)(&matching_record)?),
-            &(parameters.create.payload)(&record, match parameters.get_matching_record_id_for_association {
-                Some(get_matching_record_id_for_association) => match opt_comp {
-                    Some(opt_comp) => Some(get_matching_record_id_for_association(opt_comp).await?),
-                    None => None
-                },
-                None => None
-            })?
+            &(parameters.create.payload)(&record, find_matching_associate_record(
+                opt_comp,
+                &parameters.to_api_client,
+                parameters.get_matching_record_id_for_association
+            ).await?)?
         ).await?,
         None => create_record::<T, To>(
             parameters.create.url,
             &parameters.to_api_client,
             &parameters.to_type,
             None,
-            &(parameters.create.payload)(&record, match parameters.get_matching_record_id_for_association {
-                Some(get_matching_record_id_for_association) => match opt_comp {
-                    Some(opt_comp) => Some(get_matching_record_id_for_association(opt_comp).await?),
-                    None => None
-                },
-                None => None
-            })?
+            &(parameters.create.payload)(&record, find_matching_associate_record(
+                opt_comp,
+                &parameters.to_api_client,
+                parameters.get_matching_record_id_for_association
+            ).await?)?
         ).await?
     })
 }
+
+
 
 // Outdated:
 // create_record: impl Fn(T) -> Pin<Box<dyn Future<Output = Result<(), String>>>>, // async fn (record: T) -> Result<(), String>
