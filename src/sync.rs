@@ -90,9 +90,9 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
             &parameters.to_api_client,
             &parameters.to_type,
             Some((parameters.index_matching_id)(&matching_record)?),
-            &(parameters.create.payload)(&record, match parameters.get_matching_company_id_for_association {
-                Some(get_matching_company_id_for_association) => match opt_comp {
-                    Some(opt_comp) => Some(get_matching_company_id_for_association(opt_comp).await?),
+            &(parameters.create.payload)(&record, match parameters.get_matching_record_id_for_association {
+                Some(get_matching_record_id_for_association) => match opt_comp {
+                    Some(opt_comp) => Some(get_matching_record_id_for_association(opt_comp).await?),
                     None => None
                 },
                 None => None
@@ -103,9 +103,9 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
             &parameters.to_api_client,
             &parameters.to_type,
             None,
-            &(parameters.create.payload)(&record, match parameters.get_matching_company_id_for_association {
-                Some(get_matching_company_id_for_association) => match opt_comp {
-                    Some(opt_comp) => Some(get_matching_company_id_for_association(opt_comp).await?),
+            &(parameters.create.payload)(&record, match parameters.get_matching_record_id_for_association {
+                Some(get_matching_record_id_for_association) => match opt_comp {
+                    Some(opt_comp) => Some(get_matching_record_id_for_association(opt_comp).await?),
                     None => None
                 },
                 None => None
