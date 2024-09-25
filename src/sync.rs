@@ -17,7 +17,7 @@ pub struct SyncRecordData<T, From: ApiClient, To: ApiClient> where T: Integratio
     pub from_api_client: From,
     pub to_api_client: To,
     pub to_type: String,
-    pub get_matching_company_id_for_association: Option<fn(json: Value) -> Pin<Box<dyn Future<Output = Result<String, String>>>>>,
+    pub get_matching_record_id_for_association: Option<fn(matching_record: Value) -> Pin<Box<dyn Future<Output = Result<String, String>>>>>,
 }
 
 pub struct GetData {
