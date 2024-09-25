@@ -3,7 +3,7 @@ use std::{fmt::Debug, thread::sleep, time::Duration};
 
 use reqwest::{Client, Response};
 use serde::Deserialize;
-use serde_json::{value, Value};
+use serde_json::Value;
 use crate::{ApiClient, IntegrationRecord};
 
 

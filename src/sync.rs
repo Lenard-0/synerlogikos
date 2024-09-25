@@ -17,6 +17,7 @@ pub struct SyncRecordData<T, From: ApiClient, To: ApiClient> where T: Integratio
     pub from_api_client: From,
     pub to_api_client: To,
     pub to_type: String,
+    pub get_matching_company_id_for_association: Option<fn(json: Value) -> Pin<Box<dyn Future<Output = Result<String, String>>>>>,
 }
 
 pub struct GetData {
@@ -89,28 +90,28 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
             &parameters.to_api_client,
             &parameters.to_type,
             Some((parameters.index_matching_id)(&matching_record)?),
-            &(parameters.create.payload)(&record, get_json_id(opt_comp))?
-            // TODO: implement this
-            // match opt_company {
-            //             None => &(parameters.create.payload)(&record, get_json_id(opt_company))?,
-            //             Some(opt_company) => find_matching_contacts_company_id(opt_company)?
-            // }
+            &(parameters.create.payload)(&record, match parameters.get_matching_company_id_for_association {
+                Some(get_matching_company_id_for_association) => match opt_comp {
+                    Some(opt_comp) => Some(get_matching_company_id_for_association(opt_comp).await?),
+                    None => None
+                },
+                None => None
+            })?
         ).await?,
         None => create_record::<T, To>(
             parameters.create.url,
             &parameters.to_api_client,
             &parameters.to_type,
             None,
-            &(parameters.create.payload)(&record, get_json_id(opt_comp))?
+            &(parameters.create.payload)(&record, match parameters.get_matching_company_id_for_association {
+                Some(get_matching_company_id_for_association) => match opt_comp {
+                    Some(opt_comp) => Some(get_matching_company_id_for_association(opt_comp).await?),
+                    None => None
+                },
+                None => None
+            })?
         ).await?
     })
-}
-
-fn get_json_id(opt_comp: Option<Value>) -> Option<String> {
-    match opt_comp {
-        Some(comp) => Some(comp["id"].as_str().unwrap().to_string()),
-        None => None
-    }
 }
 
 // Outdated:
