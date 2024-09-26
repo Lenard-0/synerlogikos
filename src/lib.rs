@@ -12,4 +12,5 @@ pub trait IntegrationRecord {
 pub trait ApiClient {
     fn access_token(&self) -> String;
     fn clone_box(&self) -> Box<dyn ApiClient>;
+    fn account_id(&self) -> String;
 }
