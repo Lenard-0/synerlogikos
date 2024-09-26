@@ -46,7 +46,7 @@ pub struct UpdateData<T> where T: IntegrationRecord + Debug + for<'de> Deseriali
 
 pub struct FindMatchingData {
     pub properties: Vec<String>,
-    pub construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
+    pub construct_search_url: fn(obj_type: &str, property: &str, value: &str) -> Result<String, String>,
     pub payload: Option<fn(property: &str, value: &str) -> Value>,
     pub index_array: fn(json: Value) -> Value,
 }

@@ -10,7 +10,7 @@ pub async fn find_matching(
     record: Box<impl IntegrationRecord + ? Sized>,
     client: &Box<dyn ApiClient>,
     properties: Vec<String>,
-    construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
+    construct_search_url: fn(obj_type: &str, property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
 ) -> Result<Option<Value>, String> {
@@ -37,7 +37,7 @@ pub async fn find_matching(
 async fn search_by_property(
     property: &str,
     record: &Box<impl IntegrationRecord + ? Sized>,
-    construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
+    construct_search_url: fn(obj_type: &str, property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
     token: &str
@@ -52,7 +52,8 @@ async fn search_by_property(
         }
     };
     return match payload {
-        Some(payload) => match client.post(construct_search_url(&property, &property_value)?)
+        Some(payload) => match client
+            .post(construct_search_url(&record._type(), &property, &property_value)?)
             .bearer_auth(&token)
             .json(&payload(&property, &property_value))
             .send()
@@ -60,7 +61,8 @@ async fn search_by_property(
             Ok(res) => check_array_search_only_contains_one(res, index_array).await,
             Err(err) => Err(format!("Error searching for matching: {}", err))
         },
-        None => match client.get(construct_search_url(&property, &property_value)?)
+        None => match client
+            .get(construct_search_url(&record._type(), &property, &property_value)?)
             .bearer_auth(&token)
             .send()
             .await {

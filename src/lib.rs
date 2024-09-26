@@ -7,6 +7,7 @@ pub mod find_matching;
 
 pub trait IntegrationRecord {
     fn index_property(&self, property: &str) -> Option<String>;
+    fn _type(&self) -> String;
 }
 
 pub trait ApiClient {
