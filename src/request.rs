@@ -25,7 +25,11 @@ pub async fn requesting(
     };
 
     for header in api_client.headers() {
-        reqwest_builder = reqwest_builder.header(header.0, header.1);
+        if header.0 == "Bearer" {
+            reqwest_builder = reqwest_builder.bearer_auth(header.1);
+        } else {
+            reqwest_builder = reqwest_builder.header(header.0, header.1);
+        }
     }
 
     let req = reqwest_builder
@@ -50,7 +54,7 @@ pub async fn requesting(
     let res: Value = req
         .json()
         .await
-        .map_err(|err| format!("Error deserializing response: {:#?}", err))?;
+        .map_err(|err| format!("Error converting response to JSON: {:#?}", err))?;
 
     Ok(res)
 }
