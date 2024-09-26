@@ -6,9 +6,9 @@ use serde_json::Value;
 use crate::{sync::AssociateRecord, ApiClient, IntegrationRecord};
 
 
-pub async fn find_matching<C: ApiClient>(
+pub async fn find_matching(
     record: Box<impl IntegrationRecord + ? Sized>,
-    client: &C,
+    client: &Box<dyn ApiClient>,
     properties: Vec<String>,
     construct_search_url: fn(property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
@@ -81,9 +81,9 @@ async fn check_array_search_only_contains_one(
     }
 }
 
-pub async fn find_matching_associate_record<C: ApiClient>(
+pub async fn find_matching_associate_record(
     from_record: Option<Value>,
-    api_client: &C,
+    api_client: &Box<dyn ApiClient>,
     get_matching_record_id_for_association: Option<AssociateRecord>,
 ) -> Result<Option<String>, String> {
     match from_record {

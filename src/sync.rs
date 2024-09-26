@@ -7,15 +7,15 @@ use crate::{create::create_record, find_matching::{find_matching, find_matching_
 use core::fmt::Debug;
 use std::{future::Future, pin::Pin};
 
-pub struct SyncRecordData<T, From: ApiClient, To: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+pub struct SyncRecordData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
     pub get: GetData,
-    pub create: CreateData<T, To>,
-    pub update: UpdateData<T, To>,
+    pub create: CreateData<T>,
+    pub update: UpdateData<T>,
     pub find_matching: FindMatchingData,
     pub index_matching_id: fn(json: &Value) -> Result<String, String>,
     pub deserialize: Option<fn(&Value) -> T>,
-    pub from_api_client: From,
-    pub to_api_client: To,
+    pub from_api_client: Box<dyn ApiClient>,
+    pub to_api_client: Box<dyn ApiClient>,
     pub to_type: String,
     pub get_matching_record_id_for_association: Option<AssociateRecord>,
 }
@@ -30,17 +30,17 @@ pub struct GetData {
     pub url: String,
 }
 
-pub struct CreateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    pub url: ConstructUrl<C>,
+pub struct CreateData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+    pub url: ConstructUrl,
     pub payload: ConstructPayload<T>
 }
 
 pub type ConstructPayload<T> = fn(&T, Option<String>) -> Result<Value, String>;
 
-pub type ConstructUrl<C> = fn(client: &C, _type: &str, existing_id: &Option<String>) -> String;
+pub type ConstructUrl = fn(client: &Box<dyn ApiClient>, _type: &str, existing_id: &Option<String>) -> String;
 
-pub struct UpdateData<T, C: ApiClient> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
-    pub url: ConstructUrl<C>,
+pub struct UpdateData<T> where T: IntegrationRecord + Debug + for<'de> Deserialize<'de> {
+    pub url: ConstructUrl,
     pub payload: ConstructPayload<T>
 }
 
@@ -55,9 +55,9 @@ pub struct FindMatchingData {
 /// To sync a record from one application to another
 /// Both records should implement IntegrationRecord
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
-pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
-    parameters: SyncRecordData<T, From, To>,
-    meets_conditions: Option<impl Fn(T, Value, From) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>>,
+pub async fn sync_record<T>(
+    parameters: SyncRecordData<T>,
+    meets_conditions: Option<impl Fn(T, Value, Box<dyn ApiClient>) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>>,
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
@@ -65,7 +65,7 @@ pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     println!("got record: {:#?}", record);
 
     return match meets_conditions {
-        Some(meets_conditions) => match meets_conditions(record.clone(), json, parameters.from_api_client.clone()).await? {
+        Some(meets_conditions) => match meets_conditions(record.clone(), json, parameters.from_api_client.clone_box()).await? {
             Some(opt_company) => actualise_sync(parameters, record, opt_company).await,
             None => {
                 println!("Record did not meet conditions to sync");
@@ -76,15 +76,15 @@ pub async fn sync_record<T, From: ApiClient, To: ApiClient>(
     }
 }
 
-async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
-    parameters: SyncRecordData<T, From, To>,
+async fn actualise_sync<T>(
+    parameters: SyncRecordData<T>,
     record: T,
     opt_comp: Option<Value>,
     // find matching should return the matching record from the other system
     // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
 
-    Ok(match find_matching::<To>(
+    Ok(match find_matching(
         Box::new(record.clone()),
         &parameters.to_api_client,
         parameters.find_matching.properties,
@@ -92,7 +92,7 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
         parameters.find_matching.payload,
         parameters.find_matching.index_array,
     ).await? {
-        Some(matching_record) => update_record::<T, To>(
+        Some(matching_record) => update_record::<T>(
             parameters.update.url,
             &parameters.to_api_client,
             &parameters.to_type,
@@ -103,7 +103,7 @@ async fn actualise_sync<T, From: ApiClient, To: ApiClient>(
                 parameters.get_matching_record_id_for_association
             ).await?)?
         ).await?,
-        None => create_record::<T, To>(
+        None => create_record::<T>(
             parameters.create.url,
             &parameters.to_api_client,
             &parameters.to_type,

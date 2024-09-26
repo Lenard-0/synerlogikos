@@ -4,9 +4,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use crate::{sync::ConstructUrl, ApiClient, IntegrationRecord};
 
-pub async fn create_record<T, C: ApiClient>(
-    construct_url: ConstructUrl<C>,
-    api_client: &C,
+pub async fn create_record<T>(
+    construct_url: ConstructUrl,
+    api_client: &Box<dyn ApiClient>,
     _type: &str,
     existing_id: Option<String>,
     payload: &Value,
