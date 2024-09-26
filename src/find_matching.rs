@@ -52,14 +52,18 @@ async fn search_by_property(
         }
     };
     return match payload {
-        Some(payload) => match client
-            .post(construct_search_url(&record._type(), &property, &property_value)?)
-            .bearer_auth(&token)
-            .json(&payload(&property, &property_value))
-            .send()
+        Some(payload) => {
+            let url = construct_search_url(&record._type(), &property, &property_value)?;
+            let payload = payload(&property, &property_value);
+            match client
+                .post(&url)
+                .bearer_auth(&token)
+                .json(&payload)
+                .send()
             .await {
-            Ok(res) => check_array_search_only_contains_one(res, index_array).await,
-            Err(err) => Err(format!("Error searching for matching: {}", err))
+                Ok(res) => check_array_search_only_contains_one(res, index_array).await,
+                Err(err) => Err(format!("Error searching for matching: {}", err))
+            }
         },
         None => match client
             .get(construct_search_url(&record._type(), &property, &property_value)?)
