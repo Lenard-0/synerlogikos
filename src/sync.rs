@@ -57,15 +57,21 @@ pub struct FindMatchingData {
 /// Intended use is right after receiving a webhook of a change, pass the ID and the relevant functions here to sync
 pub async fn sync_record<T>(
     parameters: SyncRecordData<T>,
-    meets_conditions: Option<impl Fn(T, Value, Box<dyn ApiClient>) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>>,
-    // find matching should return the matching record from the other system
-    // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
+    meets_conditions: Option<impl Fn(T, Value, Box<dyn ApiClient>) -> Pin<Box<dyn Future<Output = Result<Option<Option<Value>>, String>>>>>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
-    let (record, json) = get_record(&parameters.get.url, parameters.deserialize.clone(), &parameters.from_api_client.access_token()).await?;
+    let (record, json) = get_record(
+        &parameters.get.url,
+        parameters.deserialize.clone(),
+        &parameters.from_api_client
+    ).await?;
     println!("got record: {:#?}", record);
 
     return match meets_conditions {
-        Some(meets_conditions) => match meets_conditions(record.clone(), json, parameters.from_api_client.clone_box()).await? {
+        Some(meets_conditions) => match meets_conditions(
+            record.clone(),
+            json,
+            parameters.from_api_client.clone_box()
+        ).await? {
             Some(opt_company) => actualise_sync(parameters, record, opt_company).await,
             None => {
                 println!("Record did not meet conditions to sync");
@@ -79,9 +85,7 @@ pub async fn sync_record<T>(
 async fn actualise_sync<T>(
     parameters: SyncRecordData<T>,
     record: T,
-    opt_comp: Option<Value>,
-    // find matching should return the matching record from the other system
-    // find_matching: impl Fn(&T) -> Pin<Box<dyn Future<Output = Result<Option<T>, String>>>>, // async fn (record: T) -> Result<Option<T>, String>
+    opt_comp: Option<Value>
 ) -> Result<(), String> where T: IntegrationRecord + Clone + Debug + for<'de> Deserialize<'de> {
 
     Ok(match find_matching(
@@ -116,10 +120,3 @@ async fn actualise_sync<T>(
         ).await?
     })
 }
-
-
-
-// Outdated:
-// create_record: impl Fn(T) -> Pin<Box<dyn Future<Output = Result<(), String>>>>, // async fn (record: T) -> Result<(), String>
-// update record takes in the record received, and the matching record in the other application
-// update_record: impl Fn(T, T) -> Pin<Box<dyn Future<Output = Result<(), String>>>>, // async fn (record: T) -> Result<(), String>

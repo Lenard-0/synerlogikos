@@ -1,10 +1,7 @@
 
 use std::{thread::sleep, time::Duration};
-
-use reqwest::{Client, Response};
 use serde_json::Value;
-use crate::{sync::AssociateRecord, ApiClient, IntegrationRecord};
-
+use crate::{request::{requesting, HttpMethod}, sync::AssociateRecord, ApiClient, IntegrationRecord};
 
 pub async fn find_matching(
     record: Box<impl IntegrationRecord + ? Sized>,
@@ -21,7 +18,7 @@ pub async fn find_matching(
             construct_search_url,
             payload,
             index_array,
-            &client.access_token()
+            client
         ).await?;
 
         if found_matching.is_some() {
@@ -40,10 +37,8 @@ async fn search_by_property(
     construct_search_url: fn(obj_type: &str, property: &str, value: &str) -> Result<String, String>,
     payload: Option<fn(property: &str, value: &str) -> Value>,
     index_array: fn(json: Value) -> Value,
-    token: &str
+    api_client: &Box<dyn ApiClient>
 ) -> Result<Option<Value>, String> {
-    let client = Client::new();
-
     let property_value = match record.index_property(property) {
         Some(value) => value,
         None => {
@@ -51,36 +46,27 @@ async fn search_by_property(
             return Ok(None)
         }
     };
+
     return match payload {
-        Some(payload) => {
-            let url = construct_search_url(&record._type(), &property, &property_value)?;
-            let payload = payload(&property, &property_value);
-            match client
-                .post(&url)
-                .bearer_auth(&token)
-                .json(&payload)
-                .send()
-            .await {
-                Ok(res) => check_array_search_only_contains_one(res, index_array).await,
-                Err(err) => Err(format!("Error searching for matching: {}", err))
-            }
-        },
-        None => match client
-            .get(construct_search_url(&record._type(), &property, &property_value)?)
-            .bearer_auth(&token)
-            .send()
-            .await {
-            Ok(res) => check_array_search_only_contains_one(res, index_array).await,
-            Err(err) => Err(format!("Error searching for matching: {}", err))
-        }
+        Some(payload) => check_array_search_only_contains_one(requesting(
+            &construct_search_url(&record._type(), &property, &property_value)?,
+            Some(&payload(&property, &property_value)),
+            HttpMethod::Post,
+            api_client
+        ).await?, index_array).await,
+        None => check_array_search_only_contains_one(requesting(
+            &construct_search_url(&record._type(), &property, &property_value)?,
+            None,
+            HttpMethod::Get,
+            api_client
+        ).await?, index_array).await
     }
 }
 
 async fn check_array_search_only_contains_one(
-    res: Response,
+    json: Value,
     index_array: fn(json: Value) -> Value,
 ) -> Result<Option<Value>, String> {
-    let json: Value = res.json().await.expect("Find match res not json");
     match index_array(json).as_array() {
         Some(arr) if arr.len() == 1 => Ok(Some(arr[0].clone())),
         _ => Ok(None),
